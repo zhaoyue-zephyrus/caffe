@@ -767,6 +767,61 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
   int softmax_axis_, outer_num_, inner_num_;
 };
 
+template <typename Dtype>
+class ConnectionistTemporalClassificationLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit ConnectionistTemporalClassificationLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param) {}
+  ~ConnectionistTemporalClassificationLossLayer(){
+  }
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+    const vector <Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "ConnectionistTemporalClassificationLoss"; }
+  virtual inline int ExactNumBottomBlobs() const { return 3; }
+  virtual inline int ExactNumTopBlobs() const { return -1; }
+  virtual inline int MinTopBlobs() const { return 1; }
+  virtual inline int MaxTopBlobs() const { return 2; }
+
+ protected:
+  /// @copydoc MultinomialLogisticLossLayer
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+
+  /**
+   * @brief
+   *
+   */
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  /// The internal SoftmaxLayer used to map predictions to a distribution.
+  shared_ptr<Layer<Dtype> > softmax_layer_;
+  /// prob stores the output probability predictions from the SoftmaxLayer.
+  Blob<Dtype> prob_;
+  /// bottom vector holder used in call to the underlying SoftmaxLayer::Forward
+  vector<Blob<Dtype>*> softmax_bottom_vec_;
+  /// top vector holder used in call to the underlying SoftmaxLayer::Forward
+  vector<Blob<Dtype>*> softmax_top_vec_;
+
+  Dtype** alpha_; // forward
+  Dtype** beta_;  // backward
+  Dtype** alpha_hat_; // forward_normalized
+  Dtype** beta_hat_;  // backward_normalized
+  Dtype* C_; // normalization for forward
+  Dtype* D_; // normalization for backward
+  Dtype* Q_;
+  Dtype **ab_;
+  int* real_label_;
+  int T; // length of the temporal sequence
+  int L; // length of label sequence with blanks
+//    int labelClasses; // the number of label types
+//    int labelNumber; // the number of labels
+  int softmax_axis_, outer_num_, inner_num_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_LOSS_LAYERS_HPP_
