@@ -230,14 +230,6 @@ void ConnectionistTemporalClassificationLossLayer<Dtype>::Backward_cpu(
       }
     }
     
-    std::cout<<"ab_:" << std::endl; 
-    for (int t = 0; t < T; ++t) { 
-      for (int s = 0; s< dim; ++s) {
-        std::cout<< ab_[t][s]<< " ";
-      }
-      std::cout<<std::endl;
-    }
-    
     for (int s = 0; s < L; ++s) {
       if (s%2==0) { 
         for (int t = 0; t < T; ++t) {
@@ -290,13 +282,6 @@ void ConnectionistTemporalClassificationLossLayer<Dtype>::Backward_cpu(
   const Dtype loss_weight = top[0]->cpu_diff()[0];
   caffe_scal(prob_.count(), loss_weight, bottom_diff);
   
-   std::cout<<"bottom_diff:" << std::endl; 
-    for (int t = 0; t < T; ++t) { 
-      for (int s = 0; s< dim; ++s) {
-        std::cout<< bottom_diff[t*dim+s]<< " ";
-      }
-      std::cout<<std::endl;
-    }
   }
 
   for (int i = 0; i < T; ++i) {
