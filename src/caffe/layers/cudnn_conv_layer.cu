@@ -14,10 +14,15 @@ __global__ void sync_conv_groups() { }
 template <typename Dtype>
 void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
+  const int* kernel_shape_data = this->kernel_shape_.cpu_data();
+  const int kernel_h = kernel_shape_data[0];
+  const int kernel_w = kernel_shape_data[1];
+  const size_t workspace_limit_bytes =
+      kernel_h * kernel_w * this->channels_ * sizeof(int) + 1;
+  const Dtype* weight = this->blobs_[0]->gpu_data();
   for (int i = 0; i < bottom.size(); ++i) {
     const Dtype* bottom_data = bottom[i]->gpu_data();
     Dtype* top_data = top[i]->mutable_gpu_data();
-    const Dtype* weight = this->blobs_[0]->gpu_data();
 
     // Forward through cuDNN in parallel over groups.
     for (int g = 0; g < this->group_; g++) {
@@ -25,7 +30,7 @@ void CuDNNConvolutionLayer<Dtype>::Forward_gpu(
       CUDNN_CHECK(cudnnConvolutionForward(handle_[g],
             cudnn::dataType<Dtype>::one,
             bottom_descs_[i], bottom_data + bottom_offset_ * g,
-            filter_desc_, weight + weight_offset_ * g,
+            filter_desc_, weight + this->weight_offset_ * g,
             conv_descs_[i],
             fwd_algo_[i], workspaceData_fwd[g]->mutable_gpu_data(),
             workspace_fwd_sizes_[i],
@@ -96,7 +101,7 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
               bwd_filter_algo_[i], workspaceData_bwd_filter[g]->mutable_gpu_data(),
               workspace_bwd_filter_sizes_[i],
               cudnn::dataType<Dtype>::one,
-              filter_desc_, weight_diff + weight_offset_ * g));
+              filter_desc_, weight_diff + this->weight_offset_ * g));
       }
 
       // Gradient w.r.t. bottom data.
@@ -108,7 +113,7 @@ void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
         CUDNN_CHECK(cudnnConvolutionBackwardData(
               handle_[2*this->group_ + g],
               cudnn::dataType<Dtype>::one,
-              filter_desc_, weight + weight_offset_ * g,
+              filter_desc_, weight + this->weight_offset_ * g,
               top_descs_[i], top_diff + top_offset_ * g,
               conv_descs_[i],
               bwd_data_algo_[i], workspaceData_bwd_data[g]->mutable_gpu_data(),

@@ -243,22 +243,24 @@ void CuDNNConvolutionLayer<Dtype>::LayerSetUp(
   }
 
   // Set the indexing parameters.
-  weight_offset_ = (this->num_output_ / this->group_)
-      * (this->channels_ / this->group_) * this->kernel_h_ * this->kernel_w_;
+
   bias_offset_ = (this->num_output_ / this->group_);
 
-  // Create filter descriptor.
-  cudnn::createFilterDesc<Dtype>(&filter_desc_,
-      this->num_output_ / this->group_, this->channels_ / this->group_,
-      this->kernel_h_, this->kernel_w_);
+  std::vector<int> kernel_shape;
+  kernel_shape.push_back(this->num_output_ / this->group_);
+  kernel_shape.push_back(this->channels_ / this->group_);
+  for (unsigned int i = 0; i < this->num_spatial_axes_; ++i)
+    kernel_shape.push_back(this->kernel_shape_.cpu_data()[i]);
+
+  cudnn::createNdFilterDesc<Dtype>(&filter_desc_, kernel_shape);
 
   // Create tensor descriptor(s) for data and corresponding convolution(s).
   for (int i = 0; i < bottom.size(); i++) {
     cudnnTensorDescriptor_t bottom_desc;
-    cudnn::createTensor4dDesc<Dtype>(&bottom_desc);
+    cudnn::createTensorDesc<Dtype>(&bottom_desc);
     bottom_descs_.push_back(bottom_desc);
     cudnnTensorDescriptor_t top_desc;
-    cudnn::createTensor4dDesc<Dtype>(&top_desc);
+    cudnn::createTensorDesc<Dtype>(&top_desc);
     top_descs_.push_back(top_desc);
     cudnnConvolutionDescriptor_t conv_desc;
     cudnn::createConvolutionDesc<Dtype>(&conv_desc);
@@ -267,7 +269,7 @@ void CuDNNConvolutionLayer<Dtype>::LayerSetUp(
 
   // Tensor descriptor for bias.
   if (this->bias_term_) {
-    cudnn::createTensor4dDesc<Dtype>(&bias_desc_);
+    cudnn::createTensorDesc<Dtype>(&bias_desc_);
   }
 
   handles_setup_ = true;
@@ -279,11 +281,30 @@ template <typename Dtype>
 void CuDNNConvolutionLayer<Dtype>::Reshape(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   ConvolutionLayer<Dtype>::Reshape(bottom, top);
-  bottom_offset_ = (this->channels_ / this->group_)
-      * this->height_ * this->width_;
-  top_offset_ = (this->num_output_ / this->group_)
-      * this->height_out_ * this->width_out_;
 
+  bottom_offset_ = this->bottom_dim_ / this->group_;
+  top_offset_ = this->top_dim_ / this->group_;
+
+  std::vector<int> bottom_tensor_shape(bottom[0]->shape());
+  bottom_tensor_shape[1] /= this->group_;
+  std::vector<int> bottom_tensor_stride(bottom[0]->shape().size(), 1);
+  for (int i = bottom[0]->shape().size() - 2; i >= 0; --i) {
+    bottom_tensor_stride[i] =
+        bottom[0]->shape(i + 1) * bottom_tensor_stride[i + 1];
+  }
+
+  std::vector<int> top_tensor_shape(top[0]->shape());
+  top_tensor_shape[1] /= this->group_;
+  std::vector<int> top_tensor_stride(top[0]->shape().size(), 1);
+  for (int i = top[0]->shape().size() - 2; i >= 0; --i) {
+    top_tensor_stride[i] = top[0]->shape(i + 1) * top_tensor_stride[i + 1];
+  }
+
+  std::vector<int> pad, stride;
+  for (unsigned int i = 0; i < this->num_spatial_axes_; ++i) {
+    pad.push_back(this->pad_.cpu_data()[i]);
+    stride.push_back(this->stride_.cpu_data()[i]);
+  }
   // Specify workspace limit for kernels directly until we have a
   // planning strategy and a rewrite of Caffe's GPU memory mangagement.
   //
@@ -294,23 +315,13 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
     if (prev_bottom_shapes_[i] == bottom[i]->shape()) continue;
     prev_bottom_shapes_[i] = bottom[i]->shape();
 
-    cudnn::setTensor4dDesc<Dtype>(&bottom_descs_[i],
-                                  this->num_,
-                                  this->channels_ / this->group_,
-                                  this->height_, this->width_,
-                                  this->channels_ * this->height_ * this->width_,
-                                  this->height_ * this->width_,
-                                  this->width_, 1);
-    cudnn::setTensor4dDesc<Dtype>(&top_descs_[i],
-                                  this->num_,
-                                  this->num_output_ / this->group_,
-                                  this->height_out_, this->width_out_,
-                                  this->num_output_ * this->height_out_ * this->width_out_,
-                                  this->height_out_ * this->width_out_,
-                                  this->width_out_, 1);
-    cudnn::setConvolutionDesc<Dtype>(&conv_descs_[i], bottom_descs_[i],
-                                     filter_desc_, this->pad_h_, this->pad_w_,
-                                     this->stride_h_, this->stride_w_);
+
+    cudnn::setTensorNdDesc<Dtype>(&bottom_descs_[i],
+        bottom_tensor_shape, bottom_tensor_stride);
+    cudnn::setTensorNdDesc<Dtype>(&top_descs_[i],
+        top_tensor_shape, top_tensor_stride);
+    cudnn::setNdConvolutionDesc<Dtype>(&conv_descs_[i], bottom_descs_[i],
+        filter_desc_, pad, stride);
 
     // choose forward and backward algorithms + workspace(s)
     const int kRequestedForwardAlgoCount = 6;
@@ -369,8 +380,10 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
 
   // Tensor descriptor for bias.
   if (this->bias_term_) {
-    cudnn::setTensor4dDesc<Dtype>(&bias_desc_,
-        1, this->num_output_ / this->group_, 1, 1);
+
+    vector<int> bias_shape(bottom[0]->shape().size(), 1);
+    bias_shape[1] = this->num_output_ / this->group_;
+    cudnn::setTensorNdDesc<Dtype>(&bias_desc_, bias_shape);
   }
 }
 
