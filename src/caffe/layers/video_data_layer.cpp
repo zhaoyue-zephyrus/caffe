@@ -30,6 +30,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	const int new_length  = this->layer_param_.video_data_param().new_length();
 	const int num_segments = this->layer_param_.video_data_param().num_segments();
 	const string& source = this->layer_param_.video_data_param().source();
+	const bool length_first = this->layer_param_.video_data_param().length_first();
 
 	LOG(INFO) << "Opening file: " << source;
 	std:: ifstream infile(source.c_str());
@@ -75,8 +76,16 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 		CHECK(ReadSegmentFlowToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									 offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str()));
 	else
-		CHECK(ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+		if (length_first==true)
+{
+			CHECK(ReadSegmentRGBToDatum_length_first(lines_[lines_id_].first, lines_[lines_id_].second,
 									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
+}
+		else
+{
+			CHECK(ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
+}
 	const int crop_size = this->layer_param_.transform_param().crop_size();
 	const int batch_size = this->layer_param_.video_data_param().batch_size();
 	if (crop_size > 0){
@@ -117,6 +126,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 	const int new_length = video_data_param.new_length();
 	const int num_segments = video_data_param.num_segments();
 	const int lines_size = lines_.size();
+	const bool length_first = video_data_param.length_first();
 
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
@@ -144,10 +154,20 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 				continue;
 			}
 		} else{
+		if (length_first==true)
+{
+			if(!ReadSegmentRGBToDatum_length_first(lines_[lines_id_].first, lines_[lines_id_].second,
+									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str())) {
+				continue;
+			}
+}
+		else
+{
 			if(!ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str())) {
 				continue;
 			}
+}
 		}
 
 		int offset1 = this->prefetch_data_.offset(item_id);

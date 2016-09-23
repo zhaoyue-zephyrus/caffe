@@ -358,6 +358,75 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
 	return true;
 }
 
+bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
+    const vector<int> offsets, const int height, const int width, const int length, Datum* datum, bool is_color,
+    const char* name_pattern ){
+	string* datum_string;
+
+	vector <cv::Mat> cv_img_array;
+        cv_img_array.resize(length);
+
+	char tmp[30];
+	int img_height,img_width;
+	int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+	    CV_LOAD_IMAGE_GRAYSCALE);
+	for (int i = 0; i < offsets.size(); ++i){
+		int offset = offsets[i];
+		int num_channels = (is_color ? 3 : 1);
+		//pre-loading image
+		for (int file_id = 1; file_id < length+1; ++file_id) {		
+			cv::Mat cv_img;
+			sprintf(tmp, name_pattern, int(file_id+offset));
+			string filename_t = filename + "/" + tmp;
+			cv::Mat cv_img_origin = cv::imread(filename_t, cv_read_flag);
+			if (!cv_img_origin.data){
+				LOG(ERROR) << "Could not load file " << filename;
+				return false;
+			}
+			if (height > 0 && width > 0){
+				cv::resize(cv_img_origin, cv_img, cv::Size(width, height));
+			}else{
+				cv_img = cv_img_origin;
+			}
+			img_height = cv_img.rows;
+			img_width = cv_img.cols;
+			if (file_id==1 && i==0){
+				datum->set_channels(num_channels*length*offsets.size());
+				datum->set_height(cv_img.rows);
+				datum->set_width(cv_img.cols);
+				datum->set_label(label);
+				datum->clear_data();
+				datum->clear_float_data();
+				datum_string = datum->mutable_data();
+			}
+			cv_img_array[file_id-1]=cv_img;
+		}
+
+		if (is_color) {
+		for (int c = 0; c < num_channels; ++c) {
+		  for (int file_id = 0; file_id < length; ++file_id){
+		    for (int h = 0; h < img_height; ++h) {
+		      for (int w = 0; w < img_width; ++w) {
+		        datum_string->push_back(
+			  static_cast<char>(cv_img_array[file_id].at<cv::Vec3b>(h, w)[c]));
+		      }
+		    }
+		  }
+		}
+	        } else {  // Faster than repeatedly testing is_color for each pixel w/i loop
+		  for (int file_id = 1; file_id < length+1; ++file_id){
+		    for (int h = 0; h < img_height; ++h) {
+		      for (int w = 0; w < img_width; ++w) {
+		        datum_string->push_back(
+			  static_cast<char>(cv_img_array[file_id].at<uchar>(h, w)));
+		      }
+	            }
+	          }
+		}
+	}
+	return true;
+}
+
 bool ReadSegmentFlowToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum,
     const char* name_pattern ){
