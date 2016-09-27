@@ -414,7 +414,7 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 		  }
 		}
 	        } else {  // Faster than repeatedly testing is_color for each pixel w/i loop
-		  for (int file_id = 1; file_id < length+1; ++file_id){
+		  for (int file_id = 0; file_id < length; ++file_id){
 		    for (int h = 0; h < img_height; ++h) {
 		      for (int w = 0; w < img_width; ++w) {
 		        datum_string->push_back(
