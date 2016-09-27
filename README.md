@@ -1,12 +1,5 @@
 # Action Recognition with Deep Learning
 
-Hi all,
-
-This is the ND conv and pool extension for caffe_MPI. It should be noticed that currently ND conv supports for RGB images. If you have any questions regards to ND conv and pool. Please let me know (1023zhangbowen@tongji.edu.cn).
-
-Best regards,
-Bowen
-
 [![Build Status](https://travis-ci.org/yjxiong/caffe.svg?branch=action_recog)](https://travis-ci.org/yjxiong/caffe)
 
 This branch hosts the code for the technical report ["Towards Good Practices for Very Deep Two-stream ConvNets"](http://arxiv.org/abs/1507.02159), and more.
