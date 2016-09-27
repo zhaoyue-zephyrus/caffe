@@ -10,7 +10,7 @@ layer {
     new_width: 171
     new_height: 128
     new_length: 16
-    num_segments: 1
+    num_segments: 3
     modality: RGB
     length_first: true
   }
@@ -29,7 +29,7 @@ layer {
   bottom: "data"
   top: "data_reshape"
   reshape_param{
-    shape { dim: 7 dim: 3 dim: 16 dim: 112  dim: 112}
+    shape { dim: -1 dim: 3 dim: 16 dim: 112  dim: 112}
   }
 }
 # ----------- 1st layer group ---------------
@@ -465,9 +465,8 @@ layer {
     }
   }
 }
-layer {
-  name: "loss"
-  type: "SoftmaxWithLoss"
-  bottom: "fc8"
-  bottom: "label"
-}
+layer { name: "reshape_fc" type: "Reshape" bottom: "fc8" top: "reshape_fc" reshape_param { shape { dim: [-1, 1, 3, 101] } } } 
+layer { name: "segment_consensus" type: "Pooling" bottom: "reshape_fc" top: "pool_fusion" pooling_param { pool: AVE kernel_h: 3 kernel_w: 1 } }
+layer { name: "loss" type: "SoftmaxWithLoss" bottom: "pool_fusion" bottom: "label" top: "loss" softmax_param { axis: 3} }
+layer { name: "accuracy_top1" type: "Accuracy" bottom: "pool_fusion" bottom: "label" top: "accuracy" accuracy_param {axis:3}
+  include { phase: TEST } }
