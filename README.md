@@ -33,7 +33,7 @@ This branch hosts the code for the technical report ["Towards Good Practices for
 
 ### Features
 - `VideoDataLayer` for inputing video data.
-- Training on optical flow data. 
+- Training on optical flow data.
 - Data augmentation with fixed corner cropping and multi-scale cropping.
 - Parallel training with multiple GPUs.
 - Newest cuDNN integration.
@@ -43,7 +43,7 @@ This branch hosts the code for the technical report ["Towards Good Practices for
 
 #### *See more in* [Wiki](https://github.com/yjxiong/caffe/wiki).
 
-Generally it's the same as the original caffe. Please see the original README. 
+Generally it's the same as the original caffe. Please see the original README.
 Please see following instruction for accessing features above. More detailed documentation is on the way.
 
 - Video/optic flow data
@@ -62,7 +62,7 @@ Please see following instruction for accessing features above. More detailed doc
 - Training with multiple GPUs
   - Requires OpenMPI > 1.7.4 ([Why?](https://www.open-mpi.org/faq/?category=runcuda)). **Remember to compile your OpenMPI with option `--with-cuda`**
   - Specify list of GPU IDs to be used for training, in the solver protocol buffer definition, like `device_id: [0,1,2,3]`
-  - Compile using cmake and use `mpirun` to launch caffe executable, like 
+  - Compile using cmake and use `mpirun` to launch caffe executable, like
 ```bash
 mkdir build && cd build
 cmake .. -DUSE_MPI=ON
@@ -100,14 +100,14 @@ mpirun -np 4 ./install/bin/caffe train --solver=<Your Solver File> [--weights=<P
   - [Technical Report](http://wanglimin.github.io/papers/WangGHQ15.pdf)
 
 ### Extension
-Currently all existing data layers sub-classed from `BasePrefetchingDataLayer` support parallel training. If you have newly added layer which is also sub-classed from `BasePrefetchingDataLayer`, simply implement the virtual method 
+Currently all existing data layers sub-classed from `BasePrefetchingDataLayer` support parallel training. If you have newly added layer which is also sub-classed from `BasePrefetchingDataLayer`, simply implement the virtual method
 ```C++
 inline virtual void advance_cursor();
 ```
 Its function should be forwarding the "data cursor" in your data layer for one step. Then your new layer will be able to provide support for parallel training.
 
 ### Questions
-Contact 
+Contact
 - [Limin Wang](http://wanglimin.github.io/)
 - [Yuanjun Xiong](http://personal.ie.cuhk.edu.hk/~xy012/)
 
