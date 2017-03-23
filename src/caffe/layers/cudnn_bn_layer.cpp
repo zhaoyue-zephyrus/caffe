@@ -34,31 +34,58 @@ template <typename Dtype>
 void CuDNNBNLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   // Do not call BNLayer::Reshape function as some members are unnecessary
-  this->num_ = bottom[0]->num();
-  this->channels_ = bottom[0]->channels();
-  this->height_ = bottom[0]->height();
-  this->width_ = bottom[0]->width();
-
   top[0]->ReshapeLike(*(bottom[0]));
 
   // CUDNN tensors
-  cudnn::setTensor4dDesc<Dtype>(&bottom_desc_, this->num_, this->channels_,
-                                this->height_, this->width_);
-  cudnn::setTensor4dDesc<Dtype>(&top_desc_, this->num_, this->channels_,
-                                this->height_, this->width_);
+  cudnn::setTensorNdDesc<Dtype>(&bottom_desc_, bottom[0]->shape());
+  cudnn::setTensorNdDesc<Dtype>(&top_desc_, bottom[0]->shape());
   // Fix to the spatial mode
   CUDNN_CHECK(cudnnDeriveBNTensorDescriptor(bn_param_desc_,
       bottom_desc_, CUDNN_BATCHNORM_SPATIAL));
 
   if (this->frozen_){
+	if (bottom[0]->num_axes() < 5) {
+	    this->num_ = bottom[0]->shape(0);
+	    this->channels_ = bottom[0]->shape(1);
+	    this->height_ = bottom[0]->shape(2);
+	    this->width_ = bottom[0]->shape(3);
+	    this->spatial_statistic_.Reshape(this->num_, this->channels_, 1, 1);
+	    this->batch_statistic_.Reshape(1, this->channels_, 1, 1);
+	    this->spatial_sum_multiplier_.Reshape(1, 1, this->height_, this->width_);
+	    this->batch_sum_multiplier_.Reshape(this->num_, 1, 1, 1);
+	}
+	if (bottom[0]->num_axes() >=5) {
+		vector<int> blob_shape_(5,0);
+		blob_shape_[0] = bottom[0]->shape(0);
+		blob_shape_[1] = bottom[0]->shape(1);
+		blob_shape_[2] = 1;
+		blob_shape_[3] = 1;
+		blob_shape_[4] = 1;
+	    this->spatial_statistic_.Reshape(blob_shape_);
+		blob_shape_[0] = 1;
+		blob_shape_[1] = bottom[0]->shape(1);
+		blob_shape_[2] = 1;
+		blob_shape_[3] = 1;
+		blob_shape_[4] = 1;
+	    this->batch_statistic_.Reshape(blob_shape_);
+		blob_shape_[0] = 1;
+		blob_shape_[1] = 1;
+		blob_shape_[2] = bottom[0]->shape(2);
+		blob_shape_[3] = bottom[0]->shape(3);
+		blob_shape_[4] = bottom[0]->shape(4);
+	    this->spatial_sum_multiplier_.Reshape(blob_shape_);
+		blob_shape_[0] = bottom[0]->shape(0);
+		blob_shape_[1] = 1;
+		blob_shape_[2] = 1;
+		blob_shape_[3] = 1;
+		blob_shape_[4] = 1;
+	    this->batch_sum_multiplier_.Reshape(blob_shape_);
+	
+	}
     this->broadcast_buffer_.ReshapeLike(*(bottom[0]));
-    this->spatial_statistic_.Reshape(this->num_, this->channels_, 1, 1);
-    this->batch_statistic_.Reshape(1, this->channels_, 1, 1);
 
-    this->spatial_sum_multiplier_.Reshape(1, 1, this->height_, this->width_);
     caffe_set(this->spatial_sum_multiplier_.count(), Dtype(1),
       this->spatial_sum_multiplier_.mutable_cpu_data());
-    this->batch_sum_multiplier_.Reshape(this->num_, 1, 1, 1);
     caffe_set(this->batch_sum_multiplier_.count(), Dtype(1),
       this->batch_sum_multiplier_.mutable_cpu_data());
 

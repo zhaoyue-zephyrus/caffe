@@ -29,6 +29,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	const int new_width  = this->layer_param_.video_data_param().new_width();
 	const int new_length  = this->layer_param_.video_data_param().new_length();
 	const int num_segments = this->layer_param_.video_data_param().num_segments();
+        const int step = this->layer_param_.video_data_param().step();
 	const string& source = this->layer_param_.video_data_param().source();
 	const bool length_first = this->layer_param_.video_data_param().length_first();
 
@@ -67,25 +68,36 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	frame_prefetch_rng_.reset(new Caffe::RNG(frame_prefectch_rng_seed));
 	int average_duration = (int) lines_duration_[lines_id_]/num_segments;
 	vector<int> offsets;
+        vector<vector<int> > skip_offsets;
 	for (int i = 0; i < num_segments; ++i){
 		caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
 		int offset = (*frame_rng)() % (average_duration - new_length + 1);
 		offsets.push_back(offset+i*average_duration);
+                vector<int> tmp_off;
+                for (int j=0; j< new_length; ++j) {
+                       offset = (*frame_rng)() % step;
+                       tmp_off.push_back(offset);
+                }
+                skip_offsets.push_back(tmp_off);
 	}
 	if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_FLOW)
-		CHECK(ReadSegmentFlowToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
+                if (length_first ==  true) {
+                       CHECK(ReadSegmentFlowToDatum_length_first(lines_[lines_id_].first, lines_[lines_id_].second,
+                                                                        offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str()));
+                } else {
+                                       
+		       CHECK(ReadSegmentFlowToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									 offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str()));
+                }
 	else
-		if (length_first==true)
-{
+		if (length_first==true) {
 			CHECK(ReadSegmentRGBToDatum_length_first(lines_[lines_id_].first, lines_[lines_id_].second,
-									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
-}
-		else
-{
+									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str(), step, skip_offsets));
+                }
+		else {
 			CHECK(ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str()));
-}
+                }
 	const int crop_size = this->layer_param_.transform_param().crop_size();
 	const int batch_size = this->layer_param_.video_data_param().batch_size();
 	if (crop_size > 0){
@@ -127,47 +139,70 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 	const int num_segments = video_data_param.num_segments();
 	const int lines_size = lines_.size();
 	const bool length_first = video_data_param.length_first();
+        const int step = video_data_param.step();
 
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
 		vector<int> offsets;
-		int average_duration = (int) lines_duration_[lines_id_] / num_segments;
+                vector<vector<int> > skip_offsets;
+		double  average_duration = lines_duration_[lines_id_] / num_segments;
 		for (int i = 0; i < num_segments; ++i){
 			if (this->phase_==TRAIN){
 				if (average_duration >= new_length){
 					caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
-					int offset = (*frame_rng)() % (average_duration - new_length + 1);
-					offsets.push_back(offset+i*average_duration);
+					int offset = (*frame_rng)() % ( (int)average_duration - new_length + 1);
+					offsets.push_back( (int) (offset+i* average_duration));
+                                        vector<int> tmp_off;
+                                        for (int j = 0; j < new_length; j++) {
+                                             offset = (*frame_rng)() % step;
+                                             tmp_off.push_back(offset);
+                                        }
+                                        skip_offsets.push_back(tmp_off);
 				} else {
-					offsets.push_back(0);
+					offsets.push_back((int)(i*average_duration));
+                                        vector<int> tmp_off;
+                                        for (int j = 0; j < new_length; j++) {
+                                              tmp_off.push_back(0);
+                                        }
+                                        skip_offsets.push_back(tmp_off);
 				}
 			} else{
 				if (average_duration >= new_length)
-				offsets.push_back(int((average_duration-new_length+1)/2 + i*average_duration));
+				    offsets.push_back(int((average_duration-new_length+1)/2 + i*average_duration));                         
 				else
-				offsets.push_back(0);
+				    offsets.push_back(0);
+                                vector<int> tmp_off;
+                                for (int j = 0; j < new_length; j++)
+                                        tmp_off.push_back(0);
+                                skip_offsets.push_back(tmp_off);
 			}
 		}
 		if (this->layer_param_.video_data_param().modality() == VideoDataParameter_Modality_FLOW){
+                   if  (length_first == true) {
+                       if (!ReadSegmentFlowToDatum_length_first(lines_[lines_id_].first, lines_[lines_id_].second,
+                                                                           offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str())) {
+                                continue;
+                       } 
+                   }
+                   else {
 			if(!ReadSegmentFlowToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									   offsets, new_height, new_width, new_length, &datum, name_pattern_.c_str())) {
 				continue;
 			}
+                  }
 		} else{
-		if (length_first==true)
-{
+		if (length_first==true){
 			if(!ReadSegmentRGBToDatum_length_first(lines_[lines_id_].first, lines_[lines_id_].second,
-									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str())) {
+									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str(), step, skip_offsets)) {
 				continue;
 			}
-}
-		else
-{
+                }
+		else {
 			if(!ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
 									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str())) {
 				continue;
 			}
-}
+                }    
 		}
 
 		int offset1 = this->prefetch_data_.offset(item_id);

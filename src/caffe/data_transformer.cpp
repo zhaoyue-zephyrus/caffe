@@ -271,24 +271,24 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
         }
         if (need_imgproc){
           if (has_uint8){
-        	  if (param_.is_flow() && do_mirror && c%2 == 0)
+        	  if (param_.is_flow() && do_mirror && c<datum_channels/2)
         		  datum_element = 255 - static_cast<Dtype>(multi_scale_bufferM.at<uint8_t>(h, w));
         	  else
         		  datum_element = static_cast<Dtype>(multi_scale_bufferM.at<uint8_t>(h, w));
           }else {
-        	  if (param_.is_flow() && do_mirror && c%2 == 0)
+        	  if (param_.is_flow() && do_mirror && c<datum_channels/2)
         		  datum_element = 255 - static_cast<Dtype>(multi_scale_bufferM.at<float>(h, w));
         	  else
         		  datum_element = static_cast<Dtype>(multi_scale_bufferM.at<float>(h, w));
           }
         }else {
           if (has_uint8) {
-        	  if (param_.is_flow() && do_mirror && c%2 == 0)
+        	  if (param_.is_flow() && do_mirror && c<datum_channels/2)
         		  datum_element = 255 - static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
         	  else
         		  datum_element = static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
           } else {
-        	  if (param_.is_flow() && do_mirror && c%2 == 0)
+        	  if (param_.is_flow() && do_mirror && c<datum_channels/2)
         		  datum_element = 255 - datum.float_data(data_index);
         	  else
         		  datum_element = datum.float_data(data_index);

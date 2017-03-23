@@ -727,6 +727,8 @@ message VideoDataParameter{
   // The type of input
   optional bool encoded = 15 [default = false];
   optional bool length_first = 16 [default = false];
+  // Sampling rate
+  optional uint32 step = 17 [default = 1];
 }
 message InfogainLossParameter {
   // Specify the infogain matrix source.

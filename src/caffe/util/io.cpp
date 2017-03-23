@@ -360,7 +360,7 @@ bool ReadSegmentRGBToDatum(const string& filename, const int label,
 
 bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum, bool is_color,
-    const char* name_pattern ){
+     const char* name_pattern, const int step, const vector<vector<int> > skip_offsets) {
 	string* datum_string;
 
 	vector <cv::Mat> cv_img_array;
@@ -372,17 +372,22 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 	    CV_LOAD_IMAGE_GRAYSCALE);
 	for (int i = 0; i < offsets.size(); ++i){
 		int offset = offsets[i];
+                vector<int> skip_offset = skip_offsets[i];
 		int num_channels = (is_color ? 3 : 1);
+                int last_used = 0;
 		//pre-loading image
-		for (int file_id = 1; file_id < length+1; ++file_id) {		
+		for (int file_id = 1; file_id < length+1; file_id = file_id+step) {		
 			cv::Mat cv_img;
-			sprintf(tmp, name_pattern, int(file_id+offset));
+			sprintf(tmp, name_pattern, int(file_id+offset+skip_offset[file_id-1]));
 			string filename_t = filename + "/" + tmp;
 			cv::Mat cv_img_origin = cv::imread(filename_t, cv_read_flag);
 			if (!cv_img_origin.data){
-				LOG(ERROR) << "Could not load file " << filename;
-				return false;
-			}
+                                sprintf(tmp, name_pattern, int(offset+last_used));
+                                filename_t = filename + "/" + tmp;
+                                cv_img_origin = cv::imread(filename_t, cv_read_flag);
+			} else {
+                                last_used = file_id;
+                        }
 			if (height > 0 && width > 0){
 				cv::resize(cv_img_origin, cv_img, cv::Size(width, height));
 			}else{
@@ -391,7 +396,7 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 			img_height = cv_img.rows;
 			img_width = cv_img.cols;
 			if (file_id==1 && i==0){
-				datum->set_channels(num_channels*length*offsets.size());
+				datum->set_channels(num_channels*length*offsets.size()/step);
 				datum->set_height(cv_img.rows);
 				datum->set_width(cv_img.cols);
 				datum->set_label(label);
@@ -404,7 +409,7 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 
 		if (is_color) {
 		for (int c = 0; c < num_channels; ++c) {
-		  for (int file_id = 0; file_id < length; ++file_id){
+		  for (int file_id = 0; file_id < length; file_id = file_id + step){
 		    for (int h = 0; h < img_height; ++h) {
 		      for (int w = 0; w < img_width; ++w) {
 		        datum_string->push_back(
@@ -414,7 +419,7 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 		  }
 		}
 	        } else {  // Faster than repeatedly testing is_color for each pixel w/i loop
-		  for (int file_id = 0; file_id < length; ++file_id){
+		  for (int file_id = 0; file_id < length; file_id = file_id+step){
 		    for (int h = 0; h < img_height; ++h) {
 		      for (int w = 0; w < img_width; ++w) {
 		        datum_string->push_back(
@@ -426,6 +431,75 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 	}
 	return true;
 }
+
+bool ReadSegmentFlowToDatum_length_first(const string& filename, const int label,
+    const vector<int> offsets, const int height, const int width, const int length, Datum* datum,
+    const char* name_pattern ){
+	cv::Mat cv_img_x, cv_img_y;
+	string* datum_string;
+        
+        vector<cv::Mat> cv_flowx_array;
+        vector<cv::Mat> cv_flowy_array;
+        cv_flowx_array.resize(length);
+        cv_flowy_array.resize(length);
+	char tmp[30];
+	for (int i = 0; i < offsets.size(); ++i){
+		int offset = offsets[i];
+                int last_used = 0;
+		for (int file_id = 1; file_id < length+1; ++file_id){
+			sprintf(tmp,name_pattern, 'x', int(file_id+offset));
+			string filename_x = filename + "/" + tmp;
+			cv::Mat cv_img_origin_x = cv::imread(filename_x, CV_LOAD_IMAGE_GRAYSCALE);
+			sprintf(tmp, name_pattern, 'y', int(file_id+offset));
+			string filename_y = filename + "/" + tmp;
+			cv::Mat cv_img_origin_y = cv::imread(filename_y, CV_LOAD_IMAGE_GRAYSCALE);
+			if (!cv_img_origin_x.data || !cv_img_origin_y.data){
+			   sprintf(tmp, name_pattern, 'x', int(last_used + offset));
+                           filename_x = filename + "/" + tmp;
+                           cv_img_origin_x = cv::imread(filename_x, CV_LOAD_IMAGE_GRAYSCALE);
+                           sprintf(tmp, name_pattern, 'y', int(last_used + offset));
+                           filename_y = filename + "/" + tmp;
+                           cv_img_origin_y = cv::imread(filename_y, CV_LOAD_IMAGE_GRAYSCALE);
+			} else
+                           last_used = file_id;
+			if (height > 0 && width > 0){
+				cv::resize(cv_img_origin_x, cv_img_x, cv::Size(width, height));
+				cv::resize(cv_img_origin_y, cv_img_y, cv::Size(width, height));
+			}else{
+				cv_img_x = cv_img_origin_x;
+				cv_img_y = cv_img_origin_y;
+			}
+			if (file_id==1 && i==0){
+				int num_channels = 2;
+				datum->set_channels(num_channels*length*offsets.size());
+				datum->set_height(cv_img_x.rows);
+				datum->set_width(cv_img_x.cols);
+				datum->set_label(label);
+				datum->clear_data();
+				datum->clear_float_data();
+				datum_string = datum->mutable_data();
+			}
+                        cv_flowx_array[file_id-1] = cv_img_x;
+                        cv_flowy_array[file_id-1] = cv_img_y;
+                  }
+                  for (int file_id =0; file_id < length; ++file_id) { 
+			for (int h = 0; h < cv_img_x.rows; ++h){
+				for (int w = 0; w < cv_img_x.cols; ++w){
+					datum_string->push_back(static_cast<char>(cv_flowx_array[file_id].at<uchar>(h,w)));
+				}
+			}
+                   }
+                  for (int file_id = 0; file_id < length; ++file_id) {
+			for (int h = 0; h < cv_img_y.rows; ++h){
+				for (int w = 0; w < cv_img_y.cols; ++w){
+					datum_string->push_back(static_cast<char>(cv_flowy_array[file_id].at<uchar>(h,w)));
+				}
+			}
+		}
+	}
+	return true;
+}
+
 
 bool ReadSegmentFlowToDatum(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum,
