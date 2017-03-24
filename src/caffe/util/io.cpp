@@ -435,9 +435,9 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
 bool ReadSegmentFlowToDatum_length_first(const string& filename, const int label,
     const vector<int> offsets, const int height, const int width, const int length, Datum* datum,
     const char* name_pattern ){
-	cv::Mat cv_img_x, cv_img_y;
+	//cv::Mat cv_img_x, cv_img_y;
 	string* datum_string;
-        
+       int img_height, img_width;
         vector<cv::Mat> cv_flowx_array;
         vector<cv::Mat> cv_flowy_array;
         cv_flowx_array.resize(length);
@@ -447,6 +447,7 @@ bool ReadSegmentFlowToDatum_length_first(const string& filename, const int label
 		int offset = offsets[i];
                 int last_used = 0;
 		for (int file_id = 1; file_id < length+1; ++file_id){
+                        cv::Mat cv_img_x, cv_img_y;
 			sprintf(tmp,name_pattern, 'x', int(file_id+offset));
 			string filename_x = filename + "/" + tmp;
 			cv::Mat cv_img_origin_x = cv::imread(filename_x, CV_LOAD_IMAGE_GRAYSCALE);
@@ -481,17 +482,19 @@ bool ReadSegmentFlowToDatum_length_first(const string& filename, const int label
 			}
                         cv_flowx_array[file_id-1] = cv_img_x;
                         cv_flowy_array[file_id-1] = cv_img_y;
+                        img_height = cv_img_x.rows;
+                        img_width = cv_img_x.cols;
                   }
                   for (int file_id =0; file_id < length; ++file_id) { 
-			for (int h = 0; h < cv_img_x.rows; ++h){
-				for (int w = 0; w < cv_img_x.cols; ++w){
+			for (int h = 0; h <img_height; ++h){
+				for (int w = 0; w < img_width; ++w){
 					datum_string->push_back(static_cast<char>(cv_flowx_array[file_id].at<uchar>(h,w)));
 				}
 			}
                    }
                   for (int file_id = 0; file_id < length; ++file_id) {
-			for (int h = 0; h < cv_img_y.rows; ++h){
-				for (int w = 0; w < cv_img_y.cols; ++w){
+			for (int h = 0; h < img_height; ++h){
+				for (int w = 0; w < img_width; ++w){
 					datum_string->push_back(static_cast<char>(cv_flowy_array[file_id].at<uchar>(h,w)));
 				}
 			}
