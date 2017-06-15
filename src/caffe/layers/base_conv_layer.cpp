@@ -99,6 +99,14 @@ void BaseConvolutionLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
           conv_param.pad((num_pad_dims == 1) ? 0 : i);
     }
   }
+/*
+  if (!conv_param.has_dilation_h()) {
+    dilation_h_ = dilation_w_ = conv_param.dilation();
+  } else {
+    dilation_h_ = conv_param.dilation_h();
+    dilation_w_ = conv_param.dilation_w();
+  }
+*/
   // Special case: im2col is the identity for 1x1 convolution with stride 1
   // and no padding, so flag for skipping the buffer and transformation.
   is_1x1_ = true;

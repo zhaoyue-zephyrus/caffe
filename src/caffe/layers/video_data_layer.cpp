@@ -64,6 +64,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 	}
 
 	Datum datum;
+        bool is_color = !this->layer_param_.video_data_param().grayscale();
 	const unsigned int frame_prefectch_rng_seed = caffe_rng_rand();
 	frame_prefetch_rng_.reset(new Caffe::RNG(frame_prefectch_rng_seed));
 	int average_duration = (int) lines_duration_[lines_id_]/num_segments;
@@ -141,6 +142,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 	const bool length_first = video_data_param.length_first();
         const int step = video_data_param.step();
 
+        bool is_color = !this->layer_param_.video_data_param().grayscale();
 	for (int item_id = 0; item_id < batch_size; ++item_id){
 		CHECK_GT(lines_size, lines_id_);
 		vector<int> offsets;
@@ -199,7 +201,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
                 }
 		else {
 			if(!ReadSegmentRGBToDatum(lines_[lines_id_].first, lines_[lines_id_].second,
-									  offsets, new_height, new_width, new_length, &datum, true, name_pattern_.c_str())) {
+									  offsets, new_height, new_width, new_length, &datum, is_color, name_pattern_.c_str())) {
 				continue;
 			}
                 }    
