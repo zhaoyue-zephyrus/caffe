@@ -161,7 +161,10 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
       vector<cudnnConvolutionFwdAlgoPerf_t> fwd_perf;
       fwd_perf.resize(kRequestedForwardAlgoCount);
       int returnedAlgoCount;
-      CUDNN_CHECK(cudnnFindConvolutionForwardAlgorithm(handle_[0],
+      size_t mem_limit = 200*1024*1024;
+      CUDNN_CHECK(cudnnGetConvolutionForwardAlgorithm (handle_[0], bottom_descs_[i], filter_desc_, conv_descs_[i], top_descs_[i],CUDNN_CONVOLUTION_FWD_SPECIFY_WORKSPACE_LIMIT,mem_limit, &fwd_algo_[i]));
+/*
+      CUDNN_CHECK(cudnnGetConvolutionForwardWorkspaceSize(handle_[0],
                                                        bottom_descs_[i],
                                                        filter_desc_,
                                                        conv_descs_[i],
@@ -179,11 +182,19 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
           break;
         }
       }
+*/
 
       // choose backward algorithm for filter
       const int kRequestedBackwardFilterAlgoCount = 4;
       vector<cudnnConvolutionBwdFilterAlgoPerf_t> bwd_filter_perf;
       bwd_filter_perf.resize(kRequestedBackwardFilterAlgoCount);
+      CUDNN_CHECK(cudnnGetConvolutionBackwardFilterAlgorithm(handle_[0], bottom_descs_[i], top_descs_[i], conv_descs_[i], filter_desc_,
+                                                                   CUDNN_CONVOLUTION_BWD_FILTER_SPECIFY_WORKSPACE_LIMIT,
+                                                                   mem_limit,
+                                                                   &bwd_filter_algo_[i]));
+
+ 
+/*
       CUDNN_CHECK(cudnnFindConvolutionBackwardFilterAlgorithm(handle_[0],
                                                               bottom_descs_[i],
                                                               top_descs_[i],
@@ -203,10 +214,19 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
         }
       }
 
+*/
       // choose backward algo for data
       const int kRequestedBackwardDataAlgoCount = 4;
       vector<cudnnConvolutionBwdDataAlgoPerf_t> bwd_data_perf;
       bwd_data_perf.resize(kRequestedBackwardDataAlgoCount);
+
+           //backward data
+            CUDNN_CHECK(cudnnGetConvolutionBackwardDataAlgorithm(handle_[0],
+                                                                 filter_desc_, top_descs_[i], conv_descs_[i], bottom_descs_[i],
+                                                                 CUDNN_CONVOLUTION_BWD_DATA_SPECIFY_WORKSPACE_LIMIT,
+                                                                 mem_limit,
+                                                                 &bwd_data_algo_[i]));
+/*
       CUDNN_CHECK(cudnnFindConvolutionBackwardDataAlgorithm(handle_[0],
                                                             filter_desc_,
                                                             top_descs_[i],
@@ -225,6 +245,7 @@ void CuDNNConvolutionLayer<Dtype>::Reshape(
           break;
         }
       }
+*/
 
       need_benchmark_ = false;
     }
