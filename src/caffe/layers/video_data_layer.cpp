@@ -32,6 +32,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
         const int step = this->layer_param_.video_data_param().step();
 	const string& source = this->layer_param_.video_data_param().source();
 	const bool length_first = this->layer_param_.video_data_param().length_first();
+        const bool rand_step = this->layer_param_.video_data_param().rand_step();
 
 	LOG(INFO) << "Opening file: " << source;
 	std:: ifstream infile(source.c_str());
@@ -42,6 +43,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
 		lines_.push_back(std::make_pair(filename,label));
 		lines_duration_.push_back(length);
 	}
+
 	if (this->layer_param_.video_data_param().shuffle()){
 		const unsigned int prefectch_rng_seed = caffe_rng_rand();
 		prefetch_rng_1_.reset(new Caffe::RNG(prefectch_rng_seed));
@@ -72,11 +74,14 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
         vector<vector<int> > skip_offsets;
 	for (int i = 0; i < num_segments; ++i){
 		caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
-		int offset = (*frame_rng)() % (average_duration - new_length + 1);
+		int offset = (*frame_rng)() % (average_duration - step * (new_length - 1) + 1);
 		offsets.push_back(offset+i*average_duration);
                 vector<int> tmp_off;
                 for (int j=0; j< new_length; ++j) {
-                       offset = (*frame_rng)() % step;
+                       if (rand_step == true)
+                           offset = (*frame_rng)() % step;
+                       else
+                           offset = 0;
                        tmp_off.push_back(offset);
                 }
                 skip_offsets.push_back(tmp_off);
@@ -141,6 +146,7 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 	const int lines_size = lines_.size();
 	const bool length_first = video_data_param.length_first();
         const int step = video_data_param.step();
+        const bool rand_step = video_data_param.rand_step();
 
         bool is_color = !this->layer_param_.video_data_param().grayscale();
 	for (int item_id = 0; item_id < batch_size; ++item_id){
@@ -152,11 +158,14 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 			if (this->phase_==TRAIN){
 				if (average_duration >= new_length){
 					caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
-					int offset = (*frame_rng)() % ( (int)average_duration - new_length + 1);
+					int offset = (*frame_rng)() % ( (int)average_duration - step * (new_length-1) + 1);
 					offsets.push_back( (int) (offset+i* average_duration));
                                         vector<int> tmp_off;
                                         for (int j = 0; j < new_length; j++) {
-                                             offset = (*frame_rng)() % step;
+                                             if (rand_step == 0)
+                                                 offset = (*frame_rng)() % step;
+                                             else
+                                                 offset = 0;
                                              tmp_off.push_back(offset);
                                         }
                                         skip_offsets.push_back(tmp_off);
@@ -206,7 +215,10 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 			}
                 }    
 		}
-
+                // if (datum.height() != 256){
+                     // LOG(INFO) << lines_[lines_id_].first; 
+                     // continue;
+                // }
 		int offset1 = this->prefetch_data_.offset(item_id);
     	        this->transformed_data_.set_cpu_data(top_data + offset1);
 		this->data_transformer_->Transform(datum, &(this->transformed_data_));

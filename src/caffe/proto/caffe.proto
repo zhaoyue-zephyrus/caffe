@@ -737,6 +737,7 @@ message VideoDataParameter{
   // The type of input
   optional bool encoded = 15 [default = false];
   optional bool length_first = 16 [default = false];
+  optional bool rand_step = 19 [default = false];
   // Sampling rate
   optional uint32 step = 17 [default = 1];
   // The type of input
