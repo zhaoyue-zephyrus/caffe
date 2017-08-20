@@ -74,7 +74,7 @@ void VideoDataLayer<Dtype>:: DataLayerSetUp(const vector<Blob<Dtype>*>& bottom, 
         vector<vector<int> > skip_offsets;
 	for (int i = 0; i < num_segments; ++i){
 		caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
-		int offset = (*frame_rng)() % (average_duration - step * (new_length - 1) + 1);
+		int offset = (*frame_rng)() % (average_duration -  new_length + 1);
 		offsets.push_back(offset+i*average_duration);
                 vector<int> tmp_off;
                 for (int j=0; j< new_length; ++j) {
@@ -158,11 +158,11 @@ void VideoDataLayer<Dtype>::InternalThreadEntry(){
 			if (this->phase_==TRAIN){
 				if (average_duration >= new_length){
 					caffe::rng_t* frame_rng = static_cast<caffe::rng_t*>(frame_prefetch_rng_->generator());
-					int offset = (*frame_rng)() % ( (int)average_duration - step * (new_length-1) + 1);
+					int offset = (*frame_rng)() % ( (int)average_duration - new_length + 1);
 					offsets.push_back( (int) (offset+i* average_duration));
                                         vector<int> tmp_off;
                                         for (int j = 0; j < new_length; j++) {
-                                             if (rand_step == 0)
+                                             if (rand_step == true)
                                                  offset = (*frame_rng)() % step;
                                              else
                                                  offset = 0;

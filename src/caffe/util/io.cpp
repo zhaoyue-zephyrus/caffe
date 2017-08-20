@@ -447,7 +447,7 @@ bool ReadSegmentRGBToDatum_length_first(const string& filename, const int label,
                                 sprintf(tmp, name_pattern, int(offset+last_used));
                                 filename_t = filename + "/" + tmp;
                                 cv_img_origin = cv::imread(filename_t, cv_read_flag);
-                                LOG(INFO) << "Shuffling data" << filename_t;
+                                // LOG(INFO) << "Shuffling data" << filename_t;
 			} else {
                                 last_used = file_id;
                         }
